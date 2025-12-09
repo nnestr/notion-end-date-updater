@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI
 
 # Notion API token and Database ID
-NOTION_API_KEY = "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"
+NOTION_API_KEY = "ntn_247301944606xVrlif39OV73huhoJmJW18TsoSFrdKAdk02"
 NOTION_DATABASE_ID = "2c45c208d21c80678ea5dac14abdba02"
 
 app = FastAPI()
@@ -53,15 +53,25 @@ def update_all_pages():
         page_props = page["properties"]
         start_date = page_props.get("Date", {}).get("date", {}).get("start")
         period = page_props.get("Period", {}).get("select", {}).get("name", "monthly")
-        if start_date:
-            end_date = calculate_end_date(start_date, period)
-            page_url = f"https://api.notion.com/v1/pages/{page['id']}"
-            payload = {"properties": {"End Date": {"date": {"start": end_date}}}}
-            r = requests.patch(page_url, headers=HEADERS, json=payload)
-            print(f"Updated page {page['id']} with End Date {end_date}")
+        if not start_date:
+            print(f"Skipping page {page['id']} — no Date")
+            continue
+        end_date = calculate_end_date(start_date, period)
+        page_url = f"https://api.notion.com/v1/pages/{page['id']}"
+        payload = {"properties": {"End Date": {"date": {"start": end_date}}}}
+        r = requests.patch(page_url, headers=HEADERS, json=payload)
+        print(f"Updated page {page['id']} with End Date {end_date}")
 
 @app.get("/update-end-dates")
 def update_endpoint():
-    """Auto-create End Date column and update all pages"""
-    update_all_pages()
-    return {"status": "success", "message": "End Dates updated and column auto-created if missing!"}
+    """Auto-create End Date column and update all pages with error reporting"""
+    try:
+        update_all_pages()
+        return {"status": "success", "message": "End Dates updated and column auto-created if missing!"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/")
+def root():
+    """Root endpoint to check if service is live"""
+    return {"message": "Notion End Date Updater is running!"}
